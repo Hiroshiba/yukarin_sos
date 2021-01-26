@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from pytorch_trainer import report
 from torch import Tensor, nn
 
-from yukarin_so.config import ModelConfig
-from yukarin_so.network.predictor import Predictor
+from yukarin_sos.config import ModelConfig
+from yukarin_sos.network.predictor import Predictor
 
 
 def accuracy(output: Tensor, target: Tensor):

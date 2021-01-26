@@ -11,7 +11,7 @@ import yaml
 from acoustic_feature_extractor.data.phoneme import JvsPhoneme
 from acoustic_feature_extractor.data.sampling_data import SamplingData
 from yaml import SafeLoader
-from yukarin_so.trainer import create_trainer
+from yukarin_sos.trainer import create_trainer
 
 from tests.utility import get_data_directory
 
@@ -31,12 +31,12 @@ def config(config_path: Path):
 
 @pytest.fixture()
 def dataset_directory():
-    return Path("/tmp/yukarin_so_test_dataset")
+    return Path("/tmp/yukarin_sos_test_dataset")
 
 
 @pytest.fixture()
 def trained_directory():
-    return Path("/tmp/yukarin_so_test_trained")
+    return Path("/tmp/yukarin_sos_test_trained")
 
 
 def generate_dataset(

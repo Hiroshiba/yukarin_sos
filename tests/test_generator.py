@@ -4,9 +4,9 @@ import numpy
 import pytest
 import yaml
 from yaml.loader import SafeLoader
-from yukarin_so.config import Config
-from yukarin_so.generator import Generator
-from yukarin_so.network.predictor import create_predictor
+from yukarin_sos.config import Config
+from yukarin_sos.generator import Generator
+from yukarin_sos.network.predictor import create_predictor
 
 from tests.utility import get_data_directory
 
@@ -18,12 +18,12 @@ def train_config_path():
 
 @pytest.fixture()
 def trained_directory():
-    return Path("/tmp/yukarin_so_test_trained")
+    return Path("/tmp/yukarin_sos_test_trained")
 
 
 @pytest.fixture()
 def generated_directory():
-    return Path("/tmp/yukarin_so_test_generated")
+    return Path("/tmp/yukarin_sos_test_generated")
 
 
 def test_generator(

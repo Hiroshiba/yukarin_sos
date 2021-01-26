@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from yukarin_so.trainer import create_trainer
+from yukarin_sos.trainer import create_trainer
 
 
 def train(

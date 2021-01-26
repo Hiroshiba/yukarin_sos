@@ -4,8 +4,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn.utils.rnn import pad_sequence
-from yukarin_so.config import NetworkConfig
-from yukarin_so.network.positional_encoding import PositionalEncoding
+from yukarin_sos.config import NetworkConfig
+from yukarin_sos.network.positional_encoding import PositionalEncoding
 
 
 class Predictor(nn.Module):

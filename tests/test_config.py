@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 from yaml import SafeLoader
-from yukarin_so.config import Config
+from yukarin_sos.config import Config
 
 from tests.utility import get_data_directory
 

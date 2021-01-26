@@ -10,7 +10,7 @@ from acoustic_feature_extractor.data.sampling_data import SamplingData
 from torch.utils.data._utils.collate import default_convert
 from torch.utils.data.dataset import ConcatDataset, Dataset
 
-from yukarin_so.config import DatasetConfig
+from yukarin_sos.config import DatasetConfig
 
 
 def resample(rate: float, data: SamplingData):
