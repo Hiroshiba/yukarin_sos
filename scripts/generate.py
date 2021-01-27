@@ -3,12 +3,16 @@ import re
 from pathlib import Path
 from typing import Optional
 
+import numpy
 import yaml
-from yukarin_sos.config import Config
-from yukarin_sos.dataset import create_dataset
-from yukarin_sos.generator import Generator
+from more_itertools import chunked
+from pytorch_trainer.dataset.convert import concat_examples
+from torch.utils.data.dataset import ConcatDataset
 from tqdm import tqdm
 from utility.save_arguments import save_arguments
+from yukarin_sos.config import Config
+from yukarin_sos.dataset import FeatureDataset, SpeakerFeatureDataset, create_dataset
+from yukarin_sos.generator import Generator
 
 
 def _extract_number(f):
@@ -34,6 +38,8 @@ def generate(
     model_dir: Path,
     model_iteration: Optional[int],
     model_config: Optional[Path],
+    time_second: float,
+    num_test: int,
     output_dir: Path,
     use_gpu: bool,
 ):
@@ -55,10 +61,36 @@ def generate(
         use_gpu=use_gpu,
     )
 
+    sampling_rate = 200
+    config.dataset.sampling_length = int(sampling_rate * time_second)
+
+    batch_size = config.train.batch_size
+
     dataset = create_dataset(config.dataset)["test"]
-    for data in tqdm(dataset, desc="generate"):
-        target = data["target"]
-        output = generator.generate(data["feature"])
+    if isinstance(dataset, ConcatDataset):
+        dataset = dataset.datasets[0]
+
+    if isinstance(dataset.dataset, FeatureDataset):
+        phoneme_paths = [inp.phoneme_path for inp in dataset.dataset.inputs[:num_test]]
+    elif isinstance(dataset.dataset, SpeakerFeatureDataset):
+        phoneme_paths = [
+            inp.phoneme_path for inp in dataset.dataset.dataset.inputs[:num_test]
+        ]
+    else:
+        raise ValueError(dataset)
+
+    for data, phoneme_path in zip(
+        chunked(tqdm(dataset, desc="generate"), batch_size),
+        chunked(phoneme_paths, batch_size),
+    ):
+        data = concat_examples(data)
+        f0s = generator.generate(
+            phoneme=data["phoneme"],
+            speaker_id=data["speaker_id"] if "speaker_id" in data else None,
+        )
+
+        for f0, p in zip(f0s, phoneme_path):
+            numpy.save(output_dir.joinpath(p.stem + ".npy"), f0)
 
 
 if __name__ == "__main__":
@@ -66,6 +98,8 @@ if __name__ == "__main__":
     parser.add_argument("--model_dir", required=True, type=Path)
     parser.add_argument("--model_iteration", type=int)
     parser.add_argument("--model_config", type=Path)
+    parser.add_argument("--time_second", type=float, default=3)
+    parser.add_argument("--num_test", type=int, default=10)
     parser.add_argument("--output_dir", required=True, type=Path)
     parser.add_argument("--use_gpu", action="store_true")
     generate(**vars(parser.parse_args()))

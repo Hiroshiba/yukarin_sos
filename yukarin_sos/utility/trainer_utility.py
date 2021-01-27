@@ -1,13 +1,10 @@
-import torch
 from pytorch_trainer import reporter
-from pytorch_trainer.dataset.convert import converter, to_device
 from pytorch_trainer.iterators import (
     MultiprocessIterator,
     MultithreadIterator,
     SerialIterator,
 )
 from pytorch_trainer.training.util import get_trigger
-from torch._six import container_abcs
 from torch.utils.data import Dataset
 
 
@@ -50,27 +47,6 @@ def create_iterator(
                 shuffle=for_train,
                 n_threads=num_processes,
             )
-
-
-@converter()
-def list_concat(batch, device=None, padding=None):
-    assert device is None or isinstance(device, torch.device)
-    if not batch:
-        raise ValueError("batch is empty")
-
-    assert padding is None
-
-    first_elem = batch[0]
-
-    if isinstance(first_elem, container_abcs.Mapping):
-        result = {}
-        for key in first_elem:
-            result[key] = [to_device(device, example[key]) for example in batch]
-
-        return result
-
-    else:
-        raise ValueError(type(first_elem))
 
 
 class BetterValueTrigger(object):

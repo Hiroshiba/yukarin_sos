@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import numpy
-from acoustic_feature_extractor.data.phoneme import JvsPhoneme
 from acoustic_feature_extractor.data.sampling_data import SamplingData
 from torch.utils.data._utils.collate import default_convert
 from torch.utils.data.dataset import ConcatDataset, Dataset
@@ -23,20 +22,20 @@ def resample(rate: float, data: SamplingData):
 class Input:
     f0: SamplingData
     phoneme: SamplingData
-    phoneme_list: List[JvsPhoneme]
+    silence: SamplingData
 
 
 @dataclass
 class LazyInput:
     f0_path: SamplingData
     phoneme_path: SamplingData
-    phoneme_list_path: SamplingData
+    silence_path: SamplingData
 
     def generate(self):
         return Input(
             f0=SamplingData.load(self.f0_path),
             phoneme=SamplingData.load(self.phoneme_path),
-            phoneme_list=JvsPhoneme.load_julius_list(self.phoneme_list_path),
+            silence=SamplingData.load(self.silence_path),
         )
 
 
@@ -44,33 +43,49 @@ class FeatureDataset(Dataset):
     def __init__(
         self,
         inputs: List[Union[Input, LazyInput]],
+        sampling_length: int,
     ):
         self.inputs = inputs
+        self.sampling_length = sampling_length
 
     @staticmethod
     def extract_input(
         f0_data: SamplingData,
         phoneme_data: SamplingData,
-        phoneme_list_data: List[JvsPhoneme],
+        silence_data: SamplingData,
+        sampling_length: int,
     ):
+        assert len(f0_data.array) >= sampling_length
+
         rate = f0_data.rate
 
         f0 = f0_data.array
         phoneme = resample(rate=rate, data=phoneme_data)
+        silence = resample(rate=rate, data=silence_data)
 
-        length = min(len(f0), len(phoneme))
-        assert numpy.abs(length - len(f0)) < 10
-        assert numpy.abs(length - len(phoneme)) < 10
+        assert numpy.abs(len(f0) - len(phoneme)) < 5
+        assert numpy.abs(len(f0) - len(silence)) < 5
 
-        f0 = f0[:length]
-        phoneme = phoneme[:length]
+        length = min(len(f0), len(phoneme), len(silence))
 
-        phoneme_list = numpy.array([p.phoneme_id for p in phoneme_list_data])
+        for _ in range(10000):
+            offset = numpy.random.randint(length - sampling_length + 1)
+            s = numpy.squeeze(silence[offset : offset + sampling_length])
+            if not s.all():
+                break
+        else:
+            raise Exception("cannot pick not silence data")
+
+        f0 = numpy.squeeze(f0[offset : offset + sampling_length])
+        vuv = f0 != 0
+        phoneme = phoneme[offset : offset + sampling_length]
+        silence = numpy.squeeze(silence[offset : offset + sampling_length])
 
         return dict(
-            f0=f0,
+            f0=f0.astype(numpy.float32),
+            vuv=vuv,
             phoneme=numpy.argmax(phoneme, axis=1).astype(numpy.int64),
-            phoneme_list=phoneme_list.astype(numpy.int64),
+            silence=silence,
         )
 
     def __len__(self):
@@ -84,7 +99,8 @@ class FeatureDataset(Dataset):
         return self.extract_input(
             f0_data=input.f0,
             phoneme_data=input.phoneme,
-            phoneme_list_data=input.phoneme_list,
+            silence_data=input.silence,
+            sampling_length=self.sampling_length,
         )
 
 
@@ -122,8 +138,8 @@ def create_dataset(config: DatasetConfig):
     phoneme_paths = {Path(p).stem: Path(p) for p in glob(config.phoneme_glob)}
     assert set(fn_list) == set(phoneme_paths.keys())
 
-    phoneme_list_paths = {Path(p).stem: Path(p) for p in glob(config.phoneme_list_glob)}
-    assert set(fn_list) == set(phoneme_list_paths.keys())
+    silence_paths = {Path(p).stem: Path(p) for p in glob(config.silence_glob)}
+    assert set(fn_list) == set(silence_paths.keys())
 
     speaker_ids: Optional[Dict[str, int]] = None
     if config.speaker_dict_path is not None:
@@ -150,12 +166,12 @@ def create_dataset(config: DatasetConfig):
             LazyInput(
                 f0_path=f0_paths[fn],
                 phoneme_path=phoneme_paths[fn],
-                phoneme_list_path=phoneme_list_paths[fn],
+                silence_path=silence_paths[fn],
             )
             for fn in fns
         ]
 
-        dataset = FeatureDataset(inputs=inputs)
+        dataset = FeatureDataset(inputs=inputs, sampling_length=config.sampling_length)
 
         if speaker_ids is not None:
             dataset = SpeakerFeatureDataset(
