@@ -81,12 +81,31 @@ class FeatureDataset(Dataset):
         phoneme = phoneme[offset : offset + sampling_length]
         silence = numpy.squeeze(silence[offset : offset + sampling_length])
 
-        return dict(
+        if phoneme.shape[1] > 3:
+            phoneme = numpy.argmax(phoneme, axis=1)
+            start_accent = None
+            end_accent = None
+        elif phoneme.shape[1] == 3:
+            phoneme, start_accent, end_accent = (
+                phoneme[:, 0],
+                phoneme[:, 1],
+                phoneme[:, 2],
+            )
+        else:
+            raise ValueError(phoneme.shape[1])
+
+        data = dict(
             f0=f0.astype(numpy.float32),
             vuv=vuv,
-            phoneme=numpy.argmax(phoneme, axis=1).astype(numpy.int64),
+            phoneme=phoneme.astype(numpy.int64),
             silence=silence,
         )
+
+        if start_accent is not None and end_accent is not None:
+            data["start_accent"] = start_accent.astype(numpy.int64)
+            data["end_accent"] = end_accent.astype(numpy.int64)
+
+        return data
 
     def __len__(self):
         return len(self.inputs)

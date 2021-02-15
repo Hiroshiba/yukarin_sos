@@ -21,12 +21,16 @@ class Model(nn.Module):
         vuv: Tensor,
         phoneme: Tensor,
         silence: Tensor,
+        start_accent: Optional[Tensor] = None,
+        end_accent: Optional[Tensor] = None,
         speaker_id: Optional[Tensor] = None,
     ):
         batch_size = len(f0)
 
         d = self.predictor(
             phoneme=phoneme,
+            start_accent=start_accent,
+            end_accent=end_accent,
             speaker_id=speaker_id,
         )
         output_f0 = d["f0"]

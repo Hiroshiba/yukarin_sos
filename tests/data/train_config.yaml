@@ -14,6 +14,7 @@ network:
   phoneme_embedding_size: 16
   speaker_size: 100
   speaker_embedding_size: 16
+  accent_embedding_size: 2
   hidden_size_list: [64, 64, 64, 64, 64, 64, 64, 64, 64, 64]
   kernel_size_list: [21, 21, 21, 21, 21, 21, 21, 21, 21, 21]
 

@@ -86,6 +86,8 @@ def generate(
         data = concat_examples(data)
         f0s = generator.generate(
             phoneme=data["phoneme"],
+            start_accent=data["start_accent"] if "start_accent" in data else None,
+            end_accent=data["end_accent"] if "end_accent" in data else None,
             speaker_id=data["speaker_id"] if "speaker_id" in data else None,
         )
 

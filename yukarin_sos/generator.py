@@ -27,6 +27,8 @@ class Generator(object):
     def generate(
         self,
         phoneme: Union[numpy.ndarray, torch.Tensor],
+        start_accent: Optional[Union[numpy.ndarray, torch.Tensor]],
+        end_accent: Optional[Union[numpy.ndarray, torch.Tensor]],
         speaker_id: Optional[Union[numpy.ndarray, torch.Tensor]],
     ):
         if isinstance(phoneme, numpy.ndarray):
@@ -38,9 +40,21 @@ class Generator(object):
                 speaker_id = torch.from_numpy(speaker_id)
             speaker_id = speaker_id.to(torch.int64).to(self.device)
 
+        if start_accent is not None:
+            if isinstance(start_accent, numpy.ndarray):
+                start_accent = torch.from_numpy(start_accent)
+            start_accent = start_accent.to(self.device)
+
+        if end_accent is not None:
+            if isinstance(end_accent, numpy.ndarray):
+                end_accent = torch.from_numpy(end_accent)
+            end_accent = end_accent.to(self.device)
+
         with torch.no_grad():
             d = self.predictor(
                 phoneme=phoneme,
+                start_accent=start_accent,
+                end_accent=end_accent,
                 speaker_id=speaker_id,
             )
         f0, vuv = d["f0"], d["vuv"]
