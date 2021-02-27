@@ -15,6 +15,8 @@ from torch.optim.optimizer import Optimizer
 
 from yukarin_sos.config import Config
 from yukarin_sos.dataset import create_dataset
+from yukarin_sos.evaluator import GenerateEvaluator
+from yukarin_sos.generator import Generator
 from yukarin_sos.model import Model
 from yukarin_sos.network.predictor import create_predictor
 from yukarin_sos.utility.pytorch_utility import init_weights
@@ -54,6 +56,7 @@ def create_trainer(
     datasets = create_dataset(config.dataset)
     train_iter = _create_iterator(datasets["train"], for_train=True)
     test_iter = _create_iterator(datasets["test"], for_train=False)
+    eval_iter = _create_iterator(datasets["test"], for_train=False, for_eval=True)
 
     warnings.simplefilter("error", MultiprocessIterator.TimeoutWarning)
 
@@ -92,12 +95,24 @@ def create_trainer(
     ext = extensions.Evaluator(test_iter, model, device=device)
     trainer.extend(ext, name="test", trigger=trigger_log)
 
+    generator = Generator(
+        config=config,
+        predictor=predictor,
+        use_gpu=True,
+    )
+    generate_evaluator = GenerateEvaluator(
+        generator=generator,
+    )
+    ext = extensions.Evaluator(eval_iter, generate_evaluator, device=device)
+    trainer.extend(ext, name="eval", trigger=trigger_eval)
+
+    saving_model_num = 0
     if config.train.stop_iteration is not None:
         saving_model_num = int(
             config.train.stop_iteration / config.train.snapshot_iteration / 10
         )
-    else:
-        saving_model_num = 10
+    saving_model_num = max(saving_model_num, 5)
+
     ext = extensions.snapshot_object(
         predictor,
         filename="predictor_{.updater.iteration}.pth",
@@ -105,7 +120,7 @@ def create_trainer(
     )
     trainer.extend(
         ext,
-        trigger=LowValueTrigger("test/main/loss", trigger=trigger_eval),
+        trigger=LowValueTrigger("eval/main/f0_diff", trigger=trigger_eval),
     )
 
     trainer.extend(extensions.FailOnNonNumber(), trigger=trigger_log)

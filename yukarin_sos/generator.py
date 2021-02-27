@@ -51,12 +51,11 @@ class Generator(object):
             end_accent = end_accent.to(self.device)
 
         with torch.no_grad():
-            d = self.predictor(
+            f0 = self.predictor.inference(
                 phoneme=phoneme,
                 start_accent=start_accent,
                 end_accent=end_accent,
                 speaker_id=speaker_id,
             )
-        f0, vuv = d["f0"], d["vuv"]
-        f0[vuv < 0] = 0
+
         return f0.cpu().numpy()

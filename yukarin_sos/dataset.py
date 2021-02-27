@@ -77,7 +77,6 @@ class FeatureDataset(Dataset):
             raise Exception("cannot pick not silence data")
 
         f0 = numpy.squeeze(f0[offset : offset + sampling_length])
-        vuv = f0 != 0
         phoneme = phoneme[offset : offset + sampling_length]
         silence = numpy.squeeze(silence[offset : offset + sampling_length])
 
@@ -96,7 +95,6 @@ class FeatureDataset(Dataset):
 
         data = dict(
             f0=f0.astype(numpy.float32),
-            vuv=vuv,
             phoneme=phoneme.astype(numpy.int64),
             silence=silence,
         )

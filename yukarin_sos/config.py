@@ -28,6 +28,7 @@ class NetworkConfig:
     accent_embedding_size: int
     hidden_size_list: List[int]
     kernel_size_list: List[int]
+    ar_hidden_size: int
 
 
 @dataclass
@@ -79,3 +80,6 @@ class Config:
 def backward_compatible(d: Dict[str, Any]):
     if "accent_embedding_size" not in d["network"]:
         d["network"]["accent_embedding_size"] = 0
+
+    if "ar_hidden_size" not in d["network"]:
+        d["network"]["ar_hidden_size"] = 0

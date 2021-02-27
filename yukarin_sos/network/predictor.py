@@ -15,6 +15,7 @@ class Predictor(nn.Module):
         accent_embedding_size: int,
         hidden_size_list: List[int],
         kernel_size_list: List[int],
+        ar_hidden_size: int,
     ):
         layer_num = len(hidden_size_list)
         assert len(kernel_size_list) == layer_num
@@ -74,9 +75,21 @@ class Predictor(nn.Module):
 
         self.convs = nn.Sequential(*convs)
 
-        self.post = nn.Conv1d(hidden_size_list[-1], 2, kernel_size=1)
+        if ar_hidden_size == 0:
+            self.ar_gru = None
+        else:
+            self.ar_gru = nn.GRU(
+                input_size=hidden_size_list[-1] + 1,
+                hidden_size=ar_hidden_size,
+                num_layers=1,
+                batch_first=True,
+                bidirectional=False,
+            )
 
-    def forward(
+        input_size = hidden_size_list[-1] if ar_hidden_size == 0 else ar_hidden_size
+        self.post = nn.Conv1d(input_size, 2, kernel_size=1)
+
+    def forward_encoder(
         self,
         phoneme: Tensor,  # (batch, length)
         start_accent: Optional[Tensor],  # (batch, length)
@@ -107,9 +120,76 @@ class Predictor(nn.Module):
             h = torch.cat((h, accent), dim=1)  # (batch, ?, length)
 
         h = self.convs(h)  # (batch, ?, length)
+        return h
+
+    def forward(
+        self,
+        phoneme: Tensor,  # (batch, length)
+        start_accent: Optional[Tensor],  # (batch, length)
+        end_accent: Optional[Tensor],  # (batch, length)
+        f0: Tensor,  # (batch, length)
+        speaker_id: Optional[Tensor],  # (batch, )
+    ):
+        h = self.forward_encoder(
+            phoneme=phoneme,
+            start_accent=start_accent,
+            end_accent=end_accent,
+            speaker_id=speaker_id,
+        )
+
+        if self.ar_gru is not None:
+            h = h.transpose(1, 2)  # (batch, length, ?)
+            h = torch.cat((h, f0.unsqueeze(2)), dim=2)  # (batch, length, ?)
+            h, _ = self.ar_gru(h)  # (batch, length, ?)
+            h = h.transpose(1, 2)  # (batch, ?, length)
+
         h = self.post(h)  # (batch, 2, length)
         f0, vuv = h[:, 0], h[:, 1]  # (batch, length)
         return dict(f0=f0, vuv=vuv)
+
+    def inference(
+        self,
+        phoneme: Tensor,  # (batch, length)
+        start_accent: Optional[Tensor],  # (batch, length)
+        end_accent: Optional[Tensor],  # (batch, length)
+        speaker_id: Optional[Tensor],  # (batch, )
+    ):
+        batch_size = len(phoneme)
+
+        h = self.forward_encoder(
+            phoneme=phoneme,
+            start_accent=start_accent,
+            end_accent=end_accent,
+            speaker_id=speaker_id,
+        )  # (batch, ?, length)
+
+        if self.ar_gru is not None:
+            h = h.transpose(1, 2)  # (batch, length, ?)
+
+            f0_list: List[Tensor] = []
+
+            f0 = torch.zeros(batch_size, 1, dtype=h.dtype).to(h.device)  # (batch, 1)
+            hidden = None
+            for i in range(h.shape[1]):
+                h_one = h[:, i : i + 1, :]  # (batch, 1, ?)
+                h_one = torch.cat((h_one, f0.unsqueeze(2)), dim=2)  # (batch, 1, ?)
+                h_one, hidden = self.ar_gru(h_one, hidden)  # (batch, 1, ?)
+                h_one = h_one.transpose(1, 2)  # (batch, ?, 1)
+                h_one = self.post(h_one)  # (batch, 2, 1)
+
+                f0, vuv = h_one[:, 0], h_one[:, 1]  # (batch, 1)
+                f0[vuv < 0] = 0  # (batch, 1)
+
+                f0_list.append(f0)
+
+            f0 = torch.cat(f0_list, dim=1)  # (batch, length)
+
+        else:
+            h = self.post(h)  # (batch, 2, length)
+            f0, vuv = h[:, 0], h[:, 1]  # (batch, length)
+            f0[vuv < 0] = 0
+
+        return f0
 
 
 def create_predictor(config: NetworkConfig):
@@ -121,4 +201,5 @@ def create_predictor(config: NetworkConfig):
         accent_embedding_size=config.accent_embedding_size,
         hidden_size_list=config.hidden_size_list,
         kernel_size_list=config.kernel_size_list,
+        ar_hidden_size=config.ar_hidden_size,
     )

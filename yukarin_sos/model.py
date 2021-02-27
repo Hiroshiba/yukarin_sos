@@ -18,7 +18,6 @@ class Model(nn.Module):
     def __call__(
         self,
         f0: Tensor,
-        vuv: Tensor,
         phoneme: Tensor,
         silence: Tensor,
         start_accent: Optional[Tensor] = None,
@@ -26,11 +25,13 @@ class Model(nn.Module):
         speaker_id: Optional[Tensor] = None,
     ):
         batch_size = len(f0)
+        vuv = f0 != 0
 
         d = self.predictor(
             phoneme=phoneme,
             start_accent=start_accent,
             end_accent=end_accent,
+            f0=f0.roll(1, dims=1),
             speaker_id=speaker_id,
         )
         output_f0 = d["f0"]
