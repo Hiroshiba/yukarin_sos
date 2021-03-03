@@ -1,7 +1,6 @@
 from typing import Optional
 
 import numpy
-import torch.nn.functional as F
 from pytorch_trainer import report
 from torch import Tensor, nn
 
@@ -21,8 +20,9 @@ class GenerateEvaluator(nn.Module):
         f0: Tensor,
         phoneme: Tensor,
         silence: Tensor,
-        start_accent: Optional[Tensor] = None,
-        end_accent: Optional[Tensor] = None,
+        start_accent: Tensor,
+        end_accent: Tensor,
+        padded: Tensor,
         speaker_id: Optional[Tensor] = None,
     ):
         batch_size = len(f0)
@@ -33,9 +33,10 @@ class GenerateEvaluator(nn.Module):
             end_accent=end_accent,
             speaker_id=speaker_id,
         )
+        out_f0 = out_f0[~padded.cpu().numpy()]
         out_vuv = out_f0 != 0
 
-        in_f0 = f0.cpu().numpy()
+        in_f0 = f0[~padded].cpu().numpy()
         in_vuv = in_f0 != 0
 
         vuv = numpy.bitwise_and(out_vuv, in_vuv)

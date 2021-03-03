@@ -14,10 +14,19 @@ network:
   phoneme_embedding_size: 16
   speaker_size: 100
   speaker_embedding_size: 16
-  accent_embedding_size: 2
-  hidden_size_list: [64, 64, 64, 64, 64, 64, 64, 64, 64, 64]
-  kernel_size_list: [21, 21, 21, 21, 21, 21, 21, 21, 21, 21]
-  ar_hidden_size: 0
+  accent_embedding_size: 4
+  accent_encoder_type: "uni_skip_dil_cnn"
+  accent_encoder_hidden_size: 32
+  accent_encoder_kernel_size: 3
+  accent_encoder_layer_num: 7
+  phoneme_encoder_type: "uni_skip_dil_cnn"
+  phoneme_encoder_hidden_size: 32
+  phoneme_encoder_kernel_size: 3
+  phoneme_encoder_layer_num: 5
+  post_encoder_type: "skip_cnn"
+  post_encoder_hidden_size: 32
+  post_encoder_kernel_size: 1
+  post_encoder_layer_num: 2
 
 model:
   f0_loss_weight: 1
@@ -30,7 +39,11 @@ train:
   stop_iteration: 100000
   optimizer:
     name: "adam"
-    lr: 0.0003
+    lr: 0.003
+  weight_initializer: orthogonal
+  num_processes: null
+  use_multithread: false
 
 project:
-  name: null
+  name: "train_config"
+  category: "yukarin_sos"

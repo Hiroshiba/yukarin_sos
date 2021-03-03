@@ -27,9 +27,9 @@ class Input:
 
 @dataclass
 class LazyInput:
-    f0_path: SamplingData
-    phoneme_path: SamplingData
-    silence_path: SamplingData
+    f0_path: Path
+    phoneme_path: Path
+    silence_path: Path
 
     def generate(self):
         return Input(
@@ -55,8 +55,6 @@ class FeatureDataset(Dataset):
         silence_data: SamplingData,
         sampling_length: int,
     ):
-        assert len(f0_data.array) >= sampling_length
-
         rate = f0_data.rate
 
         f0 = f0_data.array
@@ -67,6 +65,11 @@ class FeatureDataset(Dataset):
         assert numpy.abs(len(f0) - len(silence)) < 5
 
         length = min(len(f0), len(phoneme), len(silence))
+        if sampling_length > length:
+            padding_length = sampling_length - length
+            sampling_length = length
+        else:
+            padding_length = 0
 
         for _ in range(10000):
             offset = numpy.random.randint(length - sampling_length + 1)
@@ -79,31 +82,31 @@ class FeatureDataset(Dataset):
         f0 = numpy.squeeze(f0[offset : offset + sampling_length])
         phoneme = phoneme[offset : offset + sampling_length]
         silence = numpy.squeeze(silence[offset : offset + sampling_length])
+        padded = numpy.zeros_like(silence)
 
-        if phoneme.shape[1] > 3:
-            phoneme = numpy.argmax(phoneme, axis=1)
-            start_accent = None
-            end_accent = None
-        elif phoneme.shape[1] == 3:
-            phoneme, start_accent, end_accent = (
-                phoneme[:, 0],
-                phoneme[:, 1],
-                phoneme[:, 2],
-            )
-        else:
-            raise ValueError(phoneme.shape[1])
+        if padding_length > 0:
+            pre = numpy.random.randint(padding_length + 1)
+            post = padding_length - pre
+            f0 = numpy.pad(f0, [pre, post])
+            phoneme = numpy.pad(phoneme, [[pre, post], [0, 0]])
+            silence = numpy.pad(silence, [pre, post], constant_values=1)
+            padded = numpy.pad(padded, [pre, post], constant_values=True)
 
-        data = dict(
+        assert phoneme.shape[1] == 3
+        phoneme, start_accent, end_accent = (
+            phoneme[:, 0],
+            phoneme[:, 1],
+            phoneme[:, 2],
+        )
+
+        return dict(
             f0=f0.astype(numpy.float32),
             phoneme=phoneme.astype(numpy.int64),
             silence=silence,
+            start_accent=start_accent.astype(numpy.int64),
+            end_accent=end_accent.astype(numpy.int64),
+            padded=padded,
         )
-
-        if start_accent is not None and end_accent is not None:
-            data["start_accent"] = start_accent.astype(numpy.int64)
-            data["end_accent"] = end_accent.astype(numpy.int64)
-
-        return data
 
     def __len__(self):
         return len(self.inputs)

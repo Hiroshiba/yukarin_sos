@@ -20,12 +20,12 @@ class Model(nn.Module):
         f0: Tensor,
         phoneme: Tensor,
         silence: Tensor,
-        start_accent: Optional[Tensor] = None,
-        end_accent: Optional[Tensor] = None,
+        start_accent: Tensor,
+        end_accent: Tensor,
+        padded: Tensor,
         speaker_id: Optional[Tensor] = None,
     ):
         batch_size = len(f0)
-        vuv = f0 != 0
 
         d = self.predictor(
             phoneme=phoneme,
@@ -34,8 +34,11 @@ class Model(nn.Module):
             f0=f0.roll(1, dims=1),
             speaker_id=speaker_id,
         )
-        output_f0 = d["f0"]
-        output_vuv = d["vuv"]
+        output_f0 = d["f0"][~padded]
+        output_vuv = d["vuv"][~padded]
+
+        f0 = f0[~padded]
+        vuv = f0 != 0
 
         loss_f0 = F.l1_loss(output_f0[vuv], f0[vuv])
         loss_vuv = F.binary_cross_entropy_with_logits(output_vuv, vuv.to(torch.float32))

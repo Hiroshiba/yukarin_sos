@@ -26,9 +26,18 @@ class NetworkConfig:
     speaker_size: int
     speaker_embedding_size: int
     accent_embedding_size: int
-    hidden_size_list: List[int]
-    kernel_size_list: List[int]
-    ar_hidden_size: int
+    accent_encoder_type: str
+    accent_encoder_hidden_size: int
+    accent_encoder_kernel_size: int
+    accent_encoder_layer_num: int
+    phoneme_encoder_type: str
+    phoneme_encoder_hidden_size: int
+    phoneme_encoder_kernel_size: int
+    phoneme_encoder_layer_num: int
+    post_encoder_type: str
+    post_encoder_hidden_size: int
+    post_encoder_kernel_size: int
+    post_encoder_layer_num: int
 
 
 @dataclass
@@ -80,6 +89,3 @@ class Config:
 def backward_compatible(d: Dict[str, Any]):
     if "accent_embedding_size" not in d["network"]:
         d["network"]["accent_embedding_size"] = 0
-
-    if "ar_hidden_size" not in d["network"]:
-        d["network"]["ar_hidden_size"] = 0
