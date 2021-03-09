@@ -40,6 +40,7 @@ def generate(
     model_config: Optional[Path],
     time_second: float,
     num_test: int,
+    num_train: int,
     output_dir: Path,
     use_gpu: bool,
 ):
@@ -66,33 +67,42 @@ def generate(
 
     batch_size = config.train.batch_size
 
-    dataset = create_dataset(config.dataset)["test"]
-    if isinstance(dataset, ConcatDataset):
-        dataset = dataset.datasets[0]
+    def generate_wrapper(dataset_type: str, num_data: int):
+        dataset = create_dataset(config.dataset)[dataset_type]
+        if isinstance(dataset, ConcatDataset):
+            dataset = dataset.datasets[0]
 
-    if isinstance(dataset.dataset, FeatureDataset):
-        phoneme_paths = [inp.phoneme_path for inp in dataset.dataset.inputs[:num_test]]
-    elif isinstance(dataset.dataset, SpeakerFeatureDataset):
-        phoneme_paths = [
-            inp.phoneme_path for inp in dataset.dataset.dataset.inputs[:num_test]
-        ]
-    else:
-        raise ValueError(dataset)
+        if isinstance(dataset.dataset, FeatureDataset):
+            phoneme_paths = [
+                inp.phoneme_path for inp in dataset.dataset.inputs[:num_data]
+            ]
+        elif isinstance(dataset.dataset, SpeakerFeatureDataset):
+            phoneme_paths = [
+                inp.phoneme_path for inp in dataset.dataset.dataset.inputs[:num_data]
+            ]
+        else:
+            raise ValueError(dataset)
 
-    for data, phoneme_path in zip(
-        chunked(tqdm(dataset, desc="generate"), batch_size),
-        chunked(phoneme_paths, batch_size),
-    ):
-        data = concat_examples(data)
-        f0s = generator.generate(
-            phoneme=data["phoneme"],
-            start_accent=data["start_accent"] if "start_accent" in data else None,
-            end_accent=data["end_accent"] if "end_accent" in data else None,
-            speaker_id=data["speaker_id"] if "speaker_id" in data else None,
-        )
+        for data, phoneme_path in zip(
+            chunked(tqdm(dataset, desc="generate"), batch_size),
+            chunked(phoneme_paths, batch_size),
+        ):
+            data = concat_examples(data)
+            f0s = generator.generate(
+                phoneme=data["phoneme"],
+                start_accent=data["start_accent"] if "start_accent" in data else None,
+                end_accent=data["end_accent"] if "end_accent" in data else None,
+                speaker_id=data["speaker_id"] if "speaker_id" in data else None,
+            )
 
-        for f0, p in zip(f0s, phoneme_path):
-            numpy.save(output_dir.joinpath(p.stem + ".npy"), f0)
+            for f0, p in zip(f0s, phoneme_path):
+                numpy.save(output_dir.joinpath(p.stem + ".npy"), f0)
+
+    if num_test > 0:
+        generate_wrapper("test", num_test)
+
+    if num_train > 0:
+        generate_wrapper("train", num_train)
 
 
 if __name__ == "__main__":
@@ -102,6 +112,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_config", type=Path)
     parser.add_argument("--time_second", type=float, default=3)
     parser.add_argument("--num_test", type=int, default=10)
+    parser.add_argument("--num_train", type=int, default=0)
     parser.add_argument("--output_dir", required=True, type=Path)
     parser.add_argument("--use_gpu", action="store_true")
     generate(**vars(parser.parse_args()))
